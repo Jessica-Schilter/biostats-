@@ -1,0 +1,989 @@
+---
+title: "midterm_refined"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-11-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Data set 1
+
+```{r}
+#install.packages('ggplot2')
+#install.packages('reshape2')
+#install.packages('png')
+
+```
+```{r}
+library(readxl)
+train <- read.csv("train.csv.gz")
+```
+
+data set 1 part 1
+
+```{r}
+#Dataset 1 Part 1
+#function to draw the digit represented by each row
+#input the train.csv data set and the row you want to draw
+draw_digit<-function(data,row){
+  #import the relevant libraries
+  library(ggplot2)
+  library(reshape2)
+  
+  #intialize the matrix with the first 28 pixels
+  pixel_grid<-data[row,2:29]
+  #rename the columns
+  colnames(pixel_grid) <- paste("Col", 1:28)
+  
+  
+  #put every 28 entries into a new row, starting at second row
+  for(x in 1:27){
+    #define first pixel in the row
+    start<-x*28+2
+    #define last pixel in the row
+    end<-start+27
+    #hold the data from those pixels temporarily
+    temp_row<-data[row,start:end]
+    #make the column names match the full matrix
+    colnames(temp_row) <- paste("Col", 1:28)
+    #add the temp row to the full matrix
+    pixel_grid<-rbind(pixel_grid,temp_row)
+  }
+  #flip the matrix
+  pixel_grid<-pixel_grid[nrow(pixel_grid):1,]
+  #name the rows
+  rownames(pixel_grid) <- paste("Row", 1:28)
+  #melt the data so ggplot can interpret it
+  #also transpose at this point
+  m<-melt(as.matrix(t(pixel_grid)))
+  #give column names to the melted data
+  colnames(m) <- c("x", "y", "value")
+  #define the theme for the heatmap - remove axis etc
+  theme<-theme(legend.position="none",axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.title.y=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank())
+  #plot the data as a greyscale heatmap
+  ggplot(m, aes(x=x,y=y,fill=value))+scale_fill_gradient(limits = c(0, 255), low = 'white', high = 'black')+geom_tile()+theme
+}
+```
+
+
+```{r}
+#call the function on a row of your choice
+draw_digit(train, 897)
+```
+data set 1 part 2 
+
+```{r}
+#Dataset 1 Part 2
+#create empty dataframe for the averages
+digit_averages<-train[FALSE,]
+#loop to get the averages for each digit 0-9
+for(x in 0:9){
+  #subset the data for the digit 
+  digit_subset<- train[which(train[,1]==x),]
+  #average the columns
+  digit_subset<-colMeans(digit_subset)
+  #add it to the dataset of averages
+  digit_averages<-rbind(digit_averages,digit_subset)
+}
+#rename the columns to the digit they represent, otherwise the labels start at 1 instead of 0
+row.names(digit_averages)<-0:9
+#call the function on the average data for the digit of your choice
+draw_digit(digit_averages,"5")
+```
+
+
+```{r}
+#draw all digit averages
+draw_digit(digit_averages,"0")
+draw_digit(digit_averages,"1")
+draw_digit(digit_averages,"2")
+draw_digit(digit_averages,"3")
+draw_digit(digit_averages,"4")
+draw_digit(digit_averages,"5")
+draw_digit(digit_averages,"6")
+draw_digit(digit_averages,"7")
+draw_digit(digit_averages,"8")
+draw_digit(digit_averages,"9")
+```
+
+part 2 b
+
+
+Visually, it appears that the digit zero maintains its appearance the best when averaged.
+
+part 3 a
+
+```{r}
+#create empty dataframe
+col_vars<-train[FALSE,]
+#calculate standard deviation of every row
+temp<-sapply(train, sd)
+#add sd to dataframe
+col_vars<-rbind(col_vars,temp)
+#rename columns
+colnames(col_vars)<-colnames(train)
+#visualize pixels with highest sd
+draw_digit(col_vars,1)
+```
+
+```{r}
+#sort the variances
+sorted_var<- temp[order(temp, decreasing = TRUE)]
+#round the data
+sorted_var<-round(sorted_var,2)
+#view the top 50 pixels by highest variance
+head(data.frame(sorted_var), 10)
+```
+
+
+
+
+```{r}
+#create empty dataframe for the variances
+digit_variance<-train[FALSE,]
+
+#loop to get the averages for each digit 0-9
+for(x in 0:9){
+  #subset the data for the digit 
+  digit_subset<- train[which(train[,1]==x),]
+  #average the columns
+  digit_subset<-sapply(digit_subset, sd)
+  #add it to the dataset of averages
+  digit_variance<-rbind(digit_variance,digit_subset)
+}
+#rename the columns to the digit they represent, otherwise the labels start at 1 instead of 0
+row.names(digit_variance)<-0:9
+colnames(digit_variance)<-colnames(train)
+```
+
+```{r}
+#function to output the top 10 pixels by variance for the selected digit
+sort_digit_variance<-function(data, digit){
+  data<-t(data)
+  data<-data[,digit]
+  data<-data[order(data, decreasing = TRUE)]
+  data<-data.frame(data)
+  colnames(data)<-digit-1
+  head(data,10)
+}
+```
+
+Using the function above, we can determine the 10 pixels with the highest variance for each digit.
+
+
+```{r}
+#call the function for each digit
+for(x in 1:10){
+  print(sort_digit_variance(digit_variance,x))
+}
+```
+
+
+Using the digit variance data, we can also visualize how much variance there is per column in each digit.
+
+```{r}
+draw_digit(digit_variance,"6")
+```
+data set 1 part 3 b
+
+
+We selected 0 as the digit that looks the best when each pixel is averaged. However, the digit 1 is the digit with the lowest average variance. Comparatively, the visual representation of the average 1 is fairly blurry.
+
+```{r}
+#create new object holding variance data
+digit_variance_nonzero<-digit_variance
+#replace zero variance pixels with NA
+digit_variance_nonzero[digit_variance_nonzero==0]<-NA
+#calculate average variance of each digit across all pixels, excluding zero variance pixels
+average_digit_var<-rowMeans(digit_variance_nonzero,na.rm=TRUE)
+#print the average variance for each digit
+print(data.frame(average_digit_var))
+```
+
+
+```{r}
+#visualize the average digit 1 for comparison
+draw_digit(digit_averages,"1")
+```
+Part 3 c.
+Does replacing the columns with the lowest variability by their average value have an effect on the digits?
+
+Replacing the lowest variability pixels with their average value has a minimal impact on the visualization, because columns with low variability had values all close to the average anyway, so the change is fairly negligible.
+
+
+replace low variance rows in train with their average(low variance columns are everything lower than 5)
+
+```{r}
+col_means<-colMeans(train)
+train_replace<-train
+
+for(x in 2:785){
+  if(col_vars[1,x]<5){
+    train_replace[x]<-col_means[x]
+  }
+}
+
+draw_digit(train_replace,6)
+```
+
+Part 3 d.
+How many columns have average values close to 255 or 0 and why ?
+
+Columns with averages close to 0 tend to be near the edges of the image and are white because there is usually nothing drawn in that space. Columns with average closer to 255 are closer to the center, and where the average digit almost always has some part of the digit included in that pixel. However, the maximum column average is only about 140, so none of the averages are particularly close to 255.
+
+
+```{r}
+#number of columns with near zero average
+near_zero<-sum(col_means[]<5)
+print(near_zero)
+#number of columns with near 255 average
+near_top<-sum(col_means[]>250)
+print(near_top)
+#highest average column value
+round(max(col_means),1)
+```
+
+Part 4
+
+Write the digits (0-9) in these squares and "digitize" them, essentially add lines corresponding to your own handwriting to this set. You should present a program that prints out digits in your handwriting.
+
+```{r}
+#install relevant packages (if not done above) and declare functions
+
+#install.packages('ggplot2')
+#install.packages('reshape2')
+#install.packages('png')
+## average over a small square (fac x fac) 
+ave_by_fac <- function(i1,fac,ii,jj){
+  ave=0;
+  cnt=0;
+  for(i in c(1:fac)){
+    for(j in c(1:fac)){
+      cnt = cnt +1;
+      x = (ii-1)*fac+i;
+      y = (jj-1)*fac+j;
+      ##	 	 cat("i,j,ii,jj,x,y=",i,j,ii,jj,x,y,"\n");
+      ave = ave+	 i1[x,y];
+    }}
+  ave = ave/cnt;
+  return(ave);
+} 
+
+## function I wrote to scale down a square image to a 28 x 28 image
+## uses the averaging function above
+scale_down_image <- function(img_in) {
+  ## fac is the factor by which you have to scale the image to become a
+  ## 28 x 28 square
+  fac <- as.integer(dim(img_in)[1]/28); 
+  im_out <- matrix(0,nrow=28,ncol=28);
+  for(i in c(1:28)){
+    for(j in c(1:28)){
+      im_out[i,j] = ave_by_fac(img_in,fac,i,j);
+    }}
+  return(im_out);
+} 
+```
+
+
+
+
+```{r}
+#Get data
+library(png)
+library(vctrs)
+library(ggplot2)
+library(reshape2)
+
+
+img<-readPNG("two_phone.png")
+
+
+#function to take png image and convert it to same format as train.csv data
+print_HW_digit<-function(img, label){
+    
+  #apply image scaling function
+  img_scaled<-scale_down_image(img[,,2])
+  
+  #rescale values in the data to match given data, 0=white, 255=black
+  img_scaled<-abs(img_scaled-1)
+  img_scaled<-img_scaled-min(img_scaled)
+  img_scaled<-img_scaled*255
+  img_scaled<-round(img_scaled,0)
+  #transpose data into correct orientation
+  img_scaled<-t(img_scaled)
+  
+  #create the label as a dataframe
+  label<-data.frame(label)
+  
+  #melt the image data so it is in long format
+  img_m<-melt(img_scaled)
+  #select only the values, excluding the x y coordinates
+  img_m<-img_m$value
+  #convert the linearized data into a data frame and transpose it so it is a row not a column
+  img_lin<-data.frame(img_m)
+  img_lin<-t(img_lin)
+  #put the label in the first column
+  img_lab<-cbind(label, img_lin)
+  #label the columns and the row
+  colnames(img_lab)<-colnames(train)
+  rownames(img_lab)<-label
+  #return the transformed data
+  return(img_lab)
+}
+
+```
+
+
+
+
+
+
+```{r}
+#call the function and store the results
+HW2<-print_HW_digit(img,"HW2")
+
+#create a dataframe to hold each handwritten digit
+HW_digits<-train[FALSE,]
+#add the digit to the dataframe
+HW_digits<-rbind(HW_digits,HW2[])
+
+#call the function on the handwritten digit of your choice
+draw_digit(HW_digits,1)
+```
+
+data set 2
+
+```{r}
+#Install/Load libraries needed
+#install.packages("reshape2")
+#install.packages("dplyr")
+#install.packages("Hmisc")
+```
+
+```{r}
+library("dplyr")
+library("Hmisc")
+library("reshape2")
+
+#Read both files, set header to true
+mcoldata<-read.csv("Mnemiopsis_col_data.csv",header=TRUE)
+mcountdata<-read.csv("Mnemiopsis_count_data.csv",header=TRUE)
+```
+
+
+
+
+```{r}
+#make new column with mean expression for all experiments with a for loop
+for(i in 1:nrow(mcountdata))
+{
+  mcountdata$expmean <- ((mcountdata$aboral1)+(mcountdata$aboral2)+(mcountdata$aboral3)+(mcountdata$aboral4)+(mcountdata$oral1)+(mcountdata$oral2)+(mcountdata$oral3)+(mcountdata$oral4))/(8)
+}
+```
+
+
+```{r}
+#Sort the dataframe by expmean and check the top 5
+sortedexpmean<-mcountdata[order(-mcountdata$expmean),]
+head(sortedexpmean)
+```
+
+
+Q1. What are the top 5 genes with the highest average expression (across experiments) in the set? What is their function?
+
+The top 5 genes with the highest average expression across experiments are: ML20395a, ML26358a, ML46651a, ML020045a, and ML00017a.
+
+Their functions are:
+
+ML20395a: Elongation factor 1-alpha (translation)
+
+ML26358a: Actin (major protein constituent of cytoskeleton-->microfilaments, and for thin filaments in muscle fibrils)
+
+ML46651a: Membrane attack complex? (according to Argot2: no other results)
+
+ML020045a: Tubulin beta chain (second protein component of microtubule)
+
+ML00017a: Elongation factor 2 (translation)
+
+
+question 2
+```{r}
+#Create new variables that hold descending values for each column
+sortedaboral1<-mcountdata[order(-mcountdata$aboral1),]
+sortedaboral1
+sortedaboral2<-mcountdata[order(-mcountdata$aboral2),]
+sortedaboral2
+sortedaboral3<-mcountdata[order(-mcountdata$aboral3),]
+sortedaboral3
+sortedaboral4<-mcountdata[order(-mcountdata$aboral4),]
+sortedaboral4
+sortedoral1<-mcountdata[order(-mcountdata$oral1),]
+sortedoral1
+sortedoral2<-mcountdata[order(-mcountdata$oral2),]
+sortedoral2
+sortedoral3<-mcountdata[order(-mcountdata$oral3),]
+sortedoral3
+sortedoral4<-mcountdata[order(-mcountdata$oral4),]
+sortedoral4
+```
+
+
+Q2. Are the top 5 genes different if done on a per-column basis?
+
+OG TOP 5 GENES ARE: ML20395a, ML26358a, ML46651a, ML020045a, and ML00017a
+
+(S) = same; (D) = different
+
+When sorted on a per-column basis, the top 5 genes differ as follows:
+aboral1: ML46651a(S), ML20395a(S), ML020045a(S), ML174731a(D),ML26358a(S)
+aboral2: ML20395a(S),ML46651a(S),ML26358a(S),ML01482a(D),ML034334a(D)
+aboral3: ML20395a(S),ML01482a(D),ML26358a(S),ML46651a(S),ML034334a(D)
+aboral4: ML01482a(D),ML20395a(S),ML034334a(D),ML46651a(S),ML034336a(D)
+oral1: ML20395a(S),ML020045a(S),ML04011a(D),ML26358a(S),ML00017a(S)
+oral2: ML20395a(S),ML020045a(S),ML04011a(D),ML00017a(S),ML26358a(S)
+oral3: ML20395a(S),ML004510a(D),ML26358a(S),ML00017a(S),ML04011a(D)
+oral4: ML20395a(S),ML004510a(D),ML46651a(S),ML020045a(S),ML00017a(S)
+-- Yes, the top 5 genes vary depending if it is done on a per-column basis. Many of the original top 5 genes reappear in these newly generated "top 5" gene sets, but each column has 1-3 different genes in its "top 5" listing.
+
+
+
+question 3
+```{r}
+#Calculate mean and standard deviation for each column
+#First for aboral1 column
+aboral1vec<-mcountdata$aboral1
+aboral1mean<-mean(aboral1vec)
+aboral1sd<-sd(aboral1vec)
+
+#Now repeat for the rest
+aboral2vec<-mcountdata$aboral2
+aboral2mean<-mean(aboral2vec)
+aboral2sd<-sd(aboral2vec)
+#aboral3
+aboral3vec<-mcountdata$aboral3
+aboral3mean<-mean(aboral3vec)
+aboral3sd<-sd(aboral3vec)
+#aboral4
+aboral4vec<-mcountdata$aboral4
+aboral4mean<-mean(aboral4vec)
+aboral4sd<-sd(aboral4vec)
+#oral1
+oral1vec<-mcountdata$oral1
+oral1mean<-mean(oral1vec)
+oral1sd<-sd(oral1vec)
+#oral2
+oral2vec<-mcountdata$oral2
+oral2mean<-mean(oral2vec)
+oral2sd<-sd(oral2vec)
+#oral3
+oral3vec<-mcountdata$oral3
+oral3mean<-mean(oral3vec)
+oral3sd<-sd(oral3vec)
+#oral4
+oral4vec<-mcountdata$oral4
+oral4mean<-mean(oral4vec)
+oral4sd<-sd(oral4vec)
+#Display mean for each column
+aboral1mean
+aboral2mean
+aboral3mean
+aboral4mean
+oral1mean
+oral2mean
+oral3mean
+oral4mean
+aboral1sd
+aboral2sd
+aboral3sd
+aboral4sd
+oral1sd
+oral2sd
+oral3sd
+oral4sd
+```
+
+```{r}
+#now scale each column such that the mean is equal to the first column 
+
+#Make a copy of this data frame to put scaled values in 
+sc.mcountdata<-mcountdata
+
+#Scale all values within each column by the conversion factor determined by the column means calculated earlier
+sc.mcountdata$aboral2<-(sc.mcountdata$aboral1)*(524.1/580.5)
+sc.mcountdata$aboral3<-(sc.mcountdata$aboral1)*(524.1/581.3)
+sc.mcountdata$aboral4<-(sc.mcountdata$aboral1)*(524.1/560.1)
+sc.mcountdata$oral1<-(sc.mcountdata$aboral1)*(524.1/551.6)
+sc.mcountdata$oral2<-(sc.mcountdata$aboral1)*(524.1/429.0)
+sc.mcountdata$oral3<-(sc.mcountdata$aboral1)*(524.1/419.6)
+sc.mcountdata$oral4<-(sc.mcountdata$aboral1)*(524.1/457.4)
+  
+head(sc.mcountdata)
+
+
+#IGNORE expmean column in sc.mcountdata data frame; just a holdover from copying the orignal data frame to be scaled
+```
+
+```{r}
+#Create a correlation matrix for the new data frame
+#corr.sc.mcountdata<-cor(sc.mcountdata[2:9],sc.mcountdata[2:9])
+#corr.sc.mcountdata
+#right now just using the unscaled data
+corr.mcountdata<-cor(mcountdata[2:9],mcountdata[2:9])
+corr.mcountdata
+#unscaled corr 
+melt.corr.mcountdata<-melt(corr.mcountdata)
+melt.corr.mcountdata
+sorted.meltcorr<-melt.corr.mcountdata[order(-melt.corr.mcountdata$value),]
+sorted.meltcorr
+#remove every other line in the output of sorted.meltcorr to remove the duplicated comparison values. 
+#We only really need half of the information because its redundant symmetrical around the self:self correlations
+```
+
+
+```{r}
+#remove every other line in the output of sorted.meltcorr to remove the duplicated comparison values. also remove the first 8 since they just correlate aboral/oral to itself
+#We only really need half of the information because its redundant symmetrical around the self:self correlations
+sorted.meltcorr2<-sorted.meltcorr[-c(1:8),]
+sorted.meltcorr2 #all 1.00 values remove
+
+#now remove duplicates be deleting every other entry
+row_odd<-seq_len(nrow(sorted.meltcorr2))%%2
+sorted.meltcorr2.ev<-sorted.meltcorr2[row_odd == 0,]
+sorted.meltcorr2.ev
+```
+
+
+For correlation values above 0.9, these samples that are closely correlated with each other are concordant with the column labels. However, we also do see high aboral v. oral correlation values at 0.85 and below.
+
+```{r}
+#install.packages('corrplot')
+library(corrplot)
+library(tidyverse)
+#install.packages('corrplot')
+library(corrplot)
+library(reshape)
+```
+
+
+4) Use correlations between rows to find the closest pairs (top 5, most positively correlated)
+correlation is which tissues have most similar expressions of a gene
+
+Are these close because they vary a lot between the groups or are they close because they don't vary much ? correlation of gene expression values between tissue types. when gene expression values are positively correlated, the tissue types(groups), have little variation. correlation test is looking at how similar the gene expression values are between tissues. so when two different tissues are expressing the same gene, how similar are those expression levels.the groups are closely correlated because there is not much variation in expression level.
+
+top 5 closest correlations
+
+sorted.meltcorr shows correlations and their coefficients in order of most positively correlated to least correlated. there are no negatives.
+
+get rid of the first 8 rows because they are just the same samples correlated with each other. this is redundant.
+
+The correlations of 1 redundant. they are the same tissue and same genes, so remove correlations of 1.
+
+
+```{r}
+#The correlations of 1 redundant. they are the same tissue and same genes, so remove correlations of 1. 
+
+#filter to get only correlations below 1. 
+sorted.meltcorr_1=sorted.meltcorr %>%  
+  gather(value, key = "colname", value = "cor") %>% 
+  filter(abs(cor) < 1)
+#remove first row because it had corr of 1 still
+sorted.meltcorr_1 <- sorted.meltcorr_1[-1,]
+#this code runs in R
+```
+
+```{r}
+#pull top 5 highest correlation values
+sorted.meltcorr2.ev[1:5,]
+
+```
+
+```{r}
+#install.packages('lineup')
+#lining up the expression data with the gene data.
+
+library(lineup)
+
+
+#findCommonID finds individuals that are in common between the two data sets
+#returns an object containing indices for the two data sets to get them to line up (omits data that appears in one set but not the other)
+
+
+id<-findCommonID(sorted.meltcorr2.ev, mcountdata)
+#subset the rows in sorted.meltcorr_1 with the IDs in id, so the rows correspond to rows in mcountdata. this will pair the correlation values with the gene.
+subcorr=c(sorted.meltcorr2.ev[id$first,], mcountdata[id$second,], what="paired")
+lineup.subcorr=data.frame(subcorr)
+
+#pull top 5 rows for top 5 correlation values and their gene IDs
+lineup.subcorr[1:5,]
+```
+
+Correlations between tissue types
+Top 5 highest correlation values with corresponding genes: 1 aboral2 aboral4 0.9747975 ML00013a
+
+2 aboral2 aboral3 0.9720700 ML000126a
+
+3 oral1 oral2 0.9586231 ML00032a
+
+4 oral3 oral4 0.9491639 ML00066a
+
+5 aboral3 aboral4 0.9491527 ML00014a
+
+correlation of gene expression values between tissue types. when gene expression values are positively correlated, the tissue types, (groups), have little variation. correlation test is looking at how similar the gene expression values are between tissues. so when two different tissues are expressing the same gene, how similar are those expression levels. the groups are closely correlated because there is not much variation in expression level.
+
+
+
+```{r}
+library(reshape2)
+library(dplyr)
+#unmelt the data and plot it
+#cast.sorted.corr=dcast(sorted.meltcorr_1, X1 ~ X2)
+corrplot(corr.mcountdata,# corrplot graphic without diagonal(eliminating corr=1)
+         diag = FALSE)
+```
+
+The correlogram represents the correlations for all pairs of variables. Positive correlations are displayed in blue and negative correlations in red,The intensity of the color is proportional to the correlation coefficient so the stronger the correlation.
+
+the closer the correlation coefficient is to +1 or -1, the stronger the correlation so find top 5 correlation coefficients that are closest to +1 or -1 (positively or negatively correlated). (top 5 most correlated data points)
+
+all correlations are positive. correlations of 1 are excluded.
+
+
+Sorting by PCA
+
+First, we calculated the PCA value for each row, forcing the number of principal components to 1. This should provide an approximation of similarity, so that rows likely to have high correlations have similar PCA values. By sorting by this value we place rows likely to be highly correlated near eachother in the dataframe. After this, we test the correlation of each row versus the five following rows and record the correlation. This sorting after dimensionality reduction is performed to reduce the computational load for calculating n^2 correlations. The method is not perfect, and may omit some highly correlated pairs, but should provide decent coverage of highly correlated genes.
+
+The histogram below shows the distribution of correlations, which does skew towards higher correlations, though maybe not as strongly as we would have liked.
+```{r}
+library(reshape2)
+
+#create pca values for each row
+pca_data<-prcomp(mcountdata[,2:9],rank. = 1)
+#add the pca values to the full dataset
+mcount_pca<-cbind(mcountdata,pca_data$x)
+#drop zeroes
+mcount_pca[mcount_pca==0]<-NA
+mcount_pca<-na.omit(mcount_pca)
+#sort by pca value
+mcount_pca_sort<-mcount_pca[order(mcount_pca$PC1),]
+#transpose and drop non-numeric data
+mcount_pca_sort_t<-t(mcount_pca_sort[2:9])
+#colnames
+colnames(mcount_pca_sort_t)<-mcount_pca_sort$Gene
+#create a dataframe to store correlations
+row_cors<-data.frame(cors=as.numeric())
+#define range to correlate across
+range<-5
+```
+
+```{r}
+#loop through each row and correlate against nearby rows
+#(in its own code cell to perform calculation separate from related code)
+for(x in 1:(ncol(mcount_pca_sort_t)-range)){
+  #upper bound is x+5 unless outside of range
+  upper<-x+range
+  if(upper>ncol(mcount_pca_sort_t)){upper<-ncol(mcount_pca_sort_t)}
+  #lower bound is x+1
+  lower<-x+1
+  #if(lower<1){lower<-1}
+  #store correlations
+  temp<-cor(mcount_pca_sort_t[1:8,x],mcount_pca_sort_t[1:8,lower:upper])
+  rownames(temp)<-colnames(mcount_pca_sort_t)[x]
+  temp_melt<-melt(temp)
+  row_cors<-rbind(row_cors,temp_melt)
+}
+```
+
+```{r}
+#sort by correlation
+row_cors<-row_cors[order(row_cors$value, decreasing = TRUE),]
+#print top 10 pairs of genes with strongest correlation
+head(row_cors,10)
+#examine the distribution of the correlations
+hist(row_cors$value)
+```
+
+End part 4 PCA section
+
+
+```{r}
+#make new column with mean expression for all experiments with a for loop
+for(i in 1:nrow(mcountdata))
+{
+  mcountdata$expmean <- ((mcountdata$aboral1)+(mcountdata$aboral2)+(mcountdata$aboral3)+(mcountdata$aboral4)+(mcountdata$oral1)+(mcountdata$oral2)+(mcountdata$oral3)+(mcountdata$oral4))/(8)
+}
+
+
+
+#Sort the dataframe by expmean and check the top 5
+sortedexpmean<-mcountdata[order(-mcountdata$expmean),]
+head(sortedexpmean)
+```
+
+
+5) If you were forced to divide the genes in each column into high,
+medium and low count genes, how would you do this based on the data that you have?
+
+```{r}
+#make new column with mean expression for all experiments with a for loop
+for(i in 1:nrow(mcountdata))
+{
+  mcountdata$expmean <- ((mcountdata$aboral1)+(mcountdata$aboral2)+(mcountdata$aboral3)+(mcountdata$aboral4)+(mcountdata$oral1)+(mcountdata$oral2)+(mcountdata$oral3)+(mcountdata$oral4))/(8)
+}
+```
+
+```{r}
+#Sort the dataframe by expmean and check the top 5
+sortedexpmean<-mcountdata[order(-mcountdata$expmean),]
+head(sortedexpmean)
+```
+
+
+```{r}
+#first plot the data to see the distribution of gene expression
+library(ggplot2)
+ggplot(mcountdata, aes(x=Gene,y= expmean)) +
+  geom_point() 
+```
+
+
+```{r}
+#6) make a list of the top 5 genes with most variability and top 5 genes with least variability (exclude genes that have low expression values)
+
+
+#perform differential expression before filtering by variance so you are using normalized counts.
+#must do between-sample normalization, which is needed to account for technical effects (differences not because of the biological conditions of interest) that prevent read count data from accurately reflecting differences in expression.
+#for this we will do DESeq differential expression
+
+#read in with no header
+coldata<-read.csv("Mnemiopsis_col_data.csv")
+countdata<-read.csv("Mnemiopsis_count_data.csv")
+
+
+
+#be sure all colnames in count data are in col data
+all(colnames(countdata))%in%rownames(coldata)
+
+#make gene column in countdata into the rownames instead of it's own column
+#do the same with the sample column in count data
+library(tidyverse)
+coldata <- data.frame(coldata, row.names = 1)#set the first column to the row names
+countdata <- data.frame(countdata, row.names = 1)
+
+#rename columns in count data to be the rownames in coldata
+colnames(countdata)=rownames(coldata)
+
+print(rownames(coldata))
+print(colnames(countdata))
+#the rownames in col data are the same as the colnames in countdata
+
+#now make sure they are in the same order
+all(colnames(countdata)==rownames(coldata))
+
+
+library(DESeq2)
+library(tidyverse)
+library(airway)
+
+#construct DESeq2 data set
+dds<-DESeqDataSetFromMatrix(countData=countdata, 
+                       colData = coldata, 
+                       design = ~condition)
+
+dds
+#design is the factor in mcoldata that specifies the condition of the samples. as in if they are treated or untreated, ets. the name condition id from the last column in mcoldata
+
+```
+
+```{r}
+#set a factor level. compare between aboral and oral samples. we need to tell deseq to use one as a reference level so you can compare the two tissue types. here we will use aboral as the reference. 
+dds$condition<- relevel(dds$condition, ref = "aboral")
+#this would have been the case either way because it assigns a reference level alphabetically, but its nice to know how to do
+```
+
+
+```{r}
+#run DESeq
+#save it back to the same object
+dds<-DESeq(dds)
+res<-results(dds)
+res
+```
+log2fold change column: positive values are up regulated genes, negative values are down regulated.
+
+
+
+```{r}
+summary(res)
+#we can adjust the pvalue so as not to detect false potives
+re0.01<-results(dds, alpha = 0.01)
+summary(re0.01)
+```
+summary shows how many genes are up and down regulated, how many are outliers, etc.
+
+
+```{r}
+resultsNames(dds)
+```
+
+```{r}
+#visualize data that is up and down regulated
+plotMA(res)
+```
+
+this plot tells us the genes that are differentially expressed. significantly differentially expressed genes,(in blue) the blue has adjusted p value of less than 0.05.
+
+the triangles indicate the genes have higher fold changes. direction of the triangles tells you the direction of the fold change.
+
+we want to see genes in the upper right or lower right quadrant because this means the genes have high means of normalized counts and high log fold changes. these are interesting genes to be looked in to.
+
+most of the data is between an expmean of 0 and 25000. therefore to divide the data into three groups, you must decide on a cutoff for low medium and high. the genes cannot be equally divided into three groups.
+
+
+```{r}
+#variability, top 5 genes with the highest variability
+sel_high = order(apply(re0.01, 1, var), decreasing=TRUE)[1:5]
+sel_high
+
+#top 5 genes with the lowest variability
+sel_low = order(apply(re0.01, 1, var), decreasing=FALSE)[1:5]
+sel_low
+```
+these numbers are the indicies to re0.01
+
+
+
+```{r}
+#print the indicies from re0.01 to get the genes with the top 5 highest and lowest variability
+
+#highest variability indicies
+print(re0.01[11025,])
+print(re0.01[12343,])
+print(re0.01[14204,])
+print(re0.01[2298,])
+print(re0.01[27,])
+
+
+#lowest variability indices
+print(re0.01[13108,])
+print(re0.01[12839,])
+print(re0.01[10103,])
+print(re0.01[8197,])
+print(re0.01[12160,])
+```
+
+
+highest variability genes from greatest variability to least: ML20395a, ML26358a, ML46651a, ML020045a, ML00017a
+
+lowest variability genes from least variability to greatest: ML32095a, ML29351a, ML16594a, ML11345a, ML25222a
+
+Question 7
+```{r}
+#Take the mean of all aboral expressions and all oral expression for each gene
+#Calculate a ratio of aboral vs oral
+#take the log of this ratio, most positive and negative 5 values are the most up and down regulated genes
+
+#Loop through and create a new column for aboral means
+for(i in 1:nrow(mcountdata))
+{
+  mcountdata$aboralmean <- ((mcountdata$aboral1)+(mcountdata$aboral2)+(mcountdata$aboral3)+(mcountdata$aboral4))/(4)
+}
+
+#And for oral means
+for(i in 1:nrow(mcountdata))
+{
+  mcountdata$oralmean <- ((mcountdata$oral1)+(mcountdata$oral2)+(mcountdata$oral3)+(mcountdata$oral4))/(4)
+}
+
+#Column containing fold-change ratio of aboral vs oral means
+for(i in 1:nrow(mcountdata))
+{
+  mcountdata$avoratio <- ((mcountdata$aboralmean)/(mcountdata$oralmean))
+}
+
+#Take the log of aboral vs oral ratio
+for(i in 1:nrow(mcountdata))
+{
+  mcountdata$logavoratio <- log((mcountdata$aboralmean)/(mcountdata$oralmean))
+}
+
+```
+
+
+We can check the generated data frame and check the most positive and negative non-zero values. The most positive are the most upregulated, and the most negative are the most downregulated (for a compared to b). Using simply the log method, the genes we are interested in are as follows. (Excluding positive and negative infinity log values). format: gene name(log of aboral vs oral ratio)
+
+Most upregulated aboral vs oral: ML327424a(6.169369), ML343422a(5.351331), ML14971a(5.258369), ML27982a(4.941642), and ML311627a(4.862107)
+
+Most downregulated aboral vs oral: ML34341a(-9.785023), ML090812a(-9.394743), ML087114a(-8.896168), ML034332a(-8.767921), and ML319815a(-8.266678)
+second part of Q7 found below
+
+
+```{r}
+#Remove cells that have non numerical value in the logavoratio column
+#Make a new df for this 
+validmcountdata<-mcountdata
+
+validmcountdata<-validmcountdata[- grep("NaN", validmcountdata$logavoratio),]
+validmcountdata<-validmcountdata[- grep("Inf", validmcountdata$logavoratio),]
+```
+
+
+```{r}
+#Also create a column for p-values from t-test results between aboralmean v oralmean
+pcounter<-1
+for(i in 1:nrow(validmcountdata))
+{
+  ab<-c(validmcountdata$aboral1[pcounter],validmcountdata$aboral2[pcounter],validmcountdata$aboral3[pcounter],validmcountdata$aboral4[pcounter])
+  or<-c(validmcountdata$oral1[pcounter],validmcountdata$oral2[pcounter],validmcountdata$oral3[pcounter],validmcountdata$oral4[pcounter])
+  validmcountdata$ttpval[pcounter] <- t.test(ab,or)$p.value
+  pcounter<- pcounter+1
+}
+```
+
+
+
+```{r}
+head(validmcountdata) #show that it worked properly
+```
+We can also rank by p-value of the t-test, which will tell us which genes have the most highly differential gene expression between the aboral vs oral values.
+
+The top 10 genes with the lowest t-test p-values are shown below:
+
+ML050913a, ML263524a, ML01833a, ML329912a, ML070258a, ML005114a, ML204423a, ML282521a, ML15096a, ML102911a
+
+
+```{r}
+sortedpval<-validmcountdata[order(validmcountdata$ttpval),]
+head(sortedpval,10)
+```
+
+
+Check for the most positive and negative non-zero values. The most positive are the most upregulated, and the most negative are the most downregulated (for a compared to b). Using simply the log method, the genes we are interested in are as follows. (Excluding positive and negative infinity log values). 
+format: gene name(log of aboral vs oral ratio)
+
+- Most upregulated aboral vs oral: ML327424a(6.169369), ML343422a(5.351331), ML14971a(5.258369), ML27982a(4.941642), and ML311627a(4.862107)
+
+- Most downregulated aboral vs oral: ML34341a(-9.785023), ML090812a(-9.394743), ML087114a(-8.896168), ML034332a(-8.767921), and ML319815a(-8.266678)
+
+
+We can also rank by p-value of the t-test, which will tell us which genes have the most highly differential gene expression between the aboral vs oral values. 
+
+The top 10 genes with the lowest t-test p-values are shown below:
+
+ML050913a, ML263524a, ML01833a, ML329912a, ML070258a, ML005114a, ML204423a, ML282521a, ML15096a, ML102911a
+
+
+
+
+
+
+
+
+
+
+
+
+
